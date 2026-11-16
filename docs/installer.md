@@ -17,8 +17,12 @@ required to start it. The README command also works before Git is installed.
 - Existing tools must pass `--version` to count as ready. Existing OpenClaw
   installs are never upgraded by this script. Upstream upgrade paths can restart
   services, so a broken existing command stops for repair.
-- Existing studio checkouts are identified by origin and required files. Their
-  files and branch are preserved. New downloads use a staging directory before rename.
+- The `openclaw-studio` skill is cloned from `Arlington-AI-Advisors/skills` into
+  a shared folder and linked into the chosen guide's user skills folder. A new
+  clone uses a staging directory before rename. Later runs fast-forward it. An
+  existing skill folder that is not this installer's link is kept.
+- An existing studio folder is reused when it has `knowledge/` or `.studio-setup/`.
+  Its files are preserved. Other non-empty folders are refused.
 
 ## Sources
 
@@ -30,6 +34,7 @@ required to start it. The README command also works before Git is installed.
 | OpenClaw | [Official local-prefix installer](https://docs.openclaw.ai/install/installer), with `--no-onboard`. It manages its private Node runtime. |
 | Codex | [Official standalone installer](https://developers.openai.com/codex/cli), with non-interactive installation. |
 | Claude Code | [Official native installer](https://code.claude.com/docs/en/setup). |
+| `openclaw-studio` skill | [Arlington-AI-Advisors/skills](https://github.com/Arlington-AI-Advisors/skills), `main` unless `STUDIO_REF` is set. |
 
 Gum and GitHub CLI versions are pinned in the script. AI tools and a new OpenClaw
 installation follow their official installer defaults. The onboarding guide records
@@ -43,24 +48,29 @@ No model identifier or provider credential is hardcoded.
 | `~/.local/bin/gh` | New GitHub CLI binary. |
 | `~/.local/share/ai-studio/openclaw/` | New OpenClaw install and its private Node runtime. |
 | `~/.local/share/ai-studio/logs/` | Installation output. Login sessions are not logged. |
-| `<studio>/.studio-setup/context.txt` | Detected tool versions and repository commit. No secrets. |
+| `~/.local/share/ai-studio/skills/` | Clone of the skills repository. |
+| `~/.claude/skills/openclaw-studio` or `~/.agents/skills/openclaw-studio` | Link to the skill for Claude Code or Codex. |
+| `<studio>/knowledge/` | The user's company documents. |
+| `<studio>/.studio-setup/context.txt` | Detected tool versions and skill commit. No secrets. |
 | `<studio>/.studio-setup/start` | Resume launcher with the tool paths and quoted studio directory. |
 
-The script uses a private umask. `.studio-setup/` is ignored by Git. AI guides keep
+The script uses a private umask. `.studio-setup/` sits outside the `studio/` Git
+repository that onboarding creates. AI guides keep
 their own files in their vendor-managed locations. The resume launcher sets its
 own PATH, so it works without editing the user's shell profile for OpenClaw or `gh`.
 
 ## Verify changes locally
 
-Run `bash -n install.sh`, then try `bash install.sh --preview --plain` and
+Run `bash -n install.sh` and `shellcheck install.sh`, then try `bash install.sh --preview --plain` and
 `bash install.sh --preview` in a real terminal. Preview does not install dependencies,
-clone a studio, or launch an AI session. The styled preview downloads Gum temporarily.
+install the skill, create a studio, or launch an AI session. The styled preview downloads Gum temporarily.
 
 Check both guide choices, a folder with spaces, keyboard cancellation, the
 numbered fallback, and the piped entry point. Use disposable machines for full
 installation checks. Do not install or sign in to AI tools on a development host
-just to exercise the UI.
+just to exercise the UI. Change the onboarding process in the skills repository,
+not here.
 
-To review a branch end to end, fetch that branch's `install.sh` and set
-`STUDIO_REF` to the same branch when running it. The default is `main`.
+To review a skills branch end to end, set `STUDIO_REF` to that branch when running
+the installer. The default is `main`.
 macOS and Windows/WSL require platform checks before claiming a verified release.

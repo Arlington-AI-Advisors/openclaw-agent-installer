@@ -5,12 +5,13 @@
 Open **Terminal**, paste this command, and press **Enter**:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/ianmatson/openclaw-agent-installer/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/Arlington-AI-Advisors/openclaw-agent-installer/main/install.sh | bash
 ```
 
 **macOS · Linux · Windows through WSL2** · Use the **↑ ↓** keys to choose and **Enter** to continue. **Ctrl+C** stops setup.
 
-The installer helps you choose an AI guide, installs missing tools, prepares your
+The installer helps you choose an AI guide, installs missing tools and the
+[studio guide skill](https://github.com/Arlington-AI-Advisors/skills), prepares your
 studio folder, and opens your guide with onboarding already started. You do not
 need Git, Node.js, OpenClaw, or an AI coding tool installed first.
 
@@ -42,10 +43,11 @@ you choose how to power the team and verify current provider support and costs.
 | Tool or task | Why it is needed |
 |---|---|
 | Your chosen AI guide | Leads the conversation and builds your studio. |
-| Git | Downloads and tracks your studio files. |
+| Git | Downloads the studio guide skill and tracks your studio files. |
 | GitHub CLI (`gh`) | Connects to GitHub when you want to save work in your own repository. |
 | OpenClaw and its Node.js runtime | Runs your AI team. A missing OpenClaw installation gets its own runtime. |
-| Studio download and return command | Prepares the files and gives you one command to continue later. |
+| The `openclaw-studio` skill | Teaches your guide the onboarding steps. Running the installer again updates it. |
+| Studio folder and return command | Prepares your folder and gives you one command to continue later. |
 
 The installer uses official tool downloads. New GitHub CLI and OpenClaw installs
 stay in your user account. Git may need your computer password. AI guide installers
@@ -97,8 +99,8 @@ That command opens your chosen guide in the correct folder, with the tools avail
 For a custom folder, use the exact command setup prints.
 
 If installation stops, run the original command again and choose the same folder.
-Working tools are reused. Existing studio files are kept, and an existing checkout
-is not automatically updated. Errors include a local log path and the next step.
+Working tools are reused, existing studio files are kept, and the studio guide skill
+is updated. Errors include a local log path and the next step.
 If an existing OpenClaw command is broken, setup stops for repair instead of replacing it.
 
 <details>
@@ -115,8 +117,9 @@ bash install.sh --no-launch     # Prepare everything, open the guide later
 Preview may download a temporary, verified UI helper. Use `--preview --plain`
 for no downloads or file changes. `NO_COLOR=1` also selects plain mode.
 
-Already have everything? Open Codex or Claude Code in this repository and say
-**begin onboarding**. Manual onboarding remains available for other AI coding tools.
+Already have an AI coding tool and OpenClaw? Install the skill with
+`npx skills add Arlington-AI-Advisors/skills --skill openclaw-studio`, open your tool
+in an empty folder, and say **begin onboarding**.
 
 The installer supports 64-bit Intel/AMD and ARM macOS and glibc Linux, including
 Ubuntu on WSL2. It needs Bash, curl, a terminal, and internet access. Alpine Linux
@@ -130,10 +133,9 @@ See [installer notes](docs/installer.md) for download sources, local paths, and 
 
 | Folder | Purpose |
 |---|---|
-| `process/` | The steps your guide follows. |
-| `principles/` | The rules used to design your team. |
-| `reference/` | Examples and integration patterns. |
 | `knowledge/` | Your company documents and notes. |
-| `studio/` | Your generated AI team and configuration. |
+| `studio/` | Your generated AI team and configuration, in its own Git repository. |
+| `.studio-setup/` | The return command and detected tool versions. |
 
-The guide's operating instructions are in [`AGENTS.md`](AGENTS.md).
+The guide's operating instructions are in the
+[`openclaw-studio` skill](https://github.com/Arlington-AI-Advisors/skills/tree/main/skills/openclaw-studio).
