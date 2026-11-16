@@ -18,8 +18,8 @@ required to start it. The README command also works before Git is installed.
   installs are never upgraded by this script. Upstream upgrade paths can restart
   services, so a broken existing command stops for repair.
 - The `openclaw-studio` skill is cloned from `Arlington-AI-Advisors/skills` into
-  a shared folder and linked into the chosen guide's user skills folder. A new
-  clone uses a staging directory before rename. Later runs fast-forward it. An
+  a shared folder and linked into the chosen guide's user skills folder. Each run
+  downloads a fresh copy into a staging directory, then replaces the old one. An
   existing skill folder that is not this installer's link is kept.
 - An existing studio folder is reused when it has `knowledge/` or `.studio-setup/`.
   Its files are preserved. Other non-empty folders are refused.

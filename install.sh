@@ -279,17 +279,13 @@ validate_destination() {
 }
 
 install_skill() {
-  if [[ -d "$SKILLS_DIR/.git" ]]; then
-    run_task 'Updating the studio guide skill' git -C "$SKILLS_DIR" pull --ff-only --quiet
-  else
-    # Clone beside the destination, then rename, so an interrupted clone is recoverable.
-    mkdir -p "$TOOLS"
-    STAGE=$(mktemp -d "$TOOLS/.skills-download.XXXXXXXX")
-    run_task 'Downloading the studio guide skill' git clone --depth 1 --branch "$SKILLS_REF" "$SKILLS_URL" "$STAGE"
-    rm -rf -- "$SKILLS_DIR"
-    mv "$STAGE" "$SKILLS_DIR"
-    STAGE=''
-  fi
+  # Clone beside the destination, then swap, so an interrupted download keeps the previous skill.
+  mkdir -p "$TOOLS"
+  STAGE=$(mktemp -d "$TOOLS/.skills-download.XXXXXXXX")
+  run_task 'Downloading the studio guide skill' git clone --depth 1 --branch "$SKILLS_REF" "$SKILLS_URL" "$STAGE"
+  rm -rf -- "$SKILLS_DIR"
+  mv "$STAGE" "$SKILLS_DIR"
+  STAGE=''
   [[ -f "$SKILL_DIR/SKILL.md" ]] || die "The downloaded skills repository has no $SKILL_NAME skill."
   local skills_home link
   case "$ASSISTANT" in
