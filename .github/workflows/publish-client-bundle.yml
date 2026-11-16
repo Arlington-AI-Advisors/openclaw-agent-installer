@@ -1,0 +1,86 @@
+name: Publish client bundle
+
+# Builds the password-protected client download and uploads it to the AAA
+# website (outside public_html). Runs when a release is published, or by hand
+# from the Actions tab.
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: publish-client-bundle
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    env:
+      SKILLS_REPO: Arlington-AI-Advisors/skills
+      SKILLS_REF: main
+      REMOTE_DIR: aaa-client-files
+      BUNDLE: aaa-openclaw-installer.zip
+    steps:
+      - name: Check out installer
+        uses: actions/checkout@v4
+
+      - name: Fetch skills repository
+        env:
+          SKILLS_TOKEN: ${{ secrets.SKILLS_REPO_TOKEN }}
+        run: |
+          set -euo pipefail
+          if [ -n "${SKILLS_TOKEN}" ]; then
+            url="https://x-access-token:${SKILLS_TOKEN}@github.com/${SKILLS_REPO}.git"
+          else
+            url="https://github.com/${SKILLS_REPO}.git"
+          fi
+          git clone --quiet --bare --single-branch --branch "$SKILLS_REF" "$url" "$RUNNER_TEMP/skills.git"
+          # Strip the token from the bundled copy's config.
+          git -C "$RUNNER_TEMP/skills.git" remote remove origin || true
+
+      - name: Build bundle
+        run: |
+          set -euo pipefail
+          root="$RUNNER_TEMP/bundle/aaa-openclaw-installer"
+          mkdir -p "$root"
+          cp install.sh "$root/install.sh"
+          chmod +x "$root/install.sh"
+          mv "$RUNNER_TEMP/skills.git" "$root/skills.git"
+          cp -R client-skill/aaa-openclaw-installer/. "$root/"
+          {
+            echo "installer_commit=${GITHUB_SHA}"
+            echo "installer_ref=${GITHUB_REF_NAME}"
+            echo "skills_commit=$(git -C "$root/skills.git" rev-parse "$SKILLS_REF")"
+            echo "built_utc=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          } > "$root/VERSION.txt"
+          bash -n "$root/install.sh"
+          # Prove the bundled skills copy clones the way install.sh will clone it.
+          git clone --quiet --depth 1 --branch "$SKILLS_REF" "file://$root/skills.git" "$RUNNER_TEMP/clone-test"
+          test -d "$RUNNER_TEMP/clone-test/skills/openclaw-studio"
+          (cd "$RUNNER_TEMP/bundle" && zip -qr -X "$RUNNER_TEMP/$BUNDLE" aaa-openclaw-installer)
+          cat "$root/VERSION.txt"
+          ls -l "$RUNNER_TEMP/$BUNDLE"
+
+      - name: Upload to website
+        env:
+          SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+          HOST: ${{ secrets.DEPLOY_HOST }}
+          USER: ${{ secrets.DEPLOY_USER }}
+        run: |
+          set -euo pipefail
+          for v in SSH_KEY KNOWN_HOSTS HOST USER; do
+            [ -n "${!v}" ] || { echo "Missing secret for $v"; exit 1; }
+          done
+          mkdir -p ~/.ssh && chmod 700 ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/deploy_key && chmod 600 ~/.ssh/deploy_key
+          printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts && chmod 644 ~/.ssh/known_hosts
+          ssh_opts=(-i ~/.ssh/deploy_key -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o BatchMode=yes)
+          ssh "${ssh_opts[@]}" "$USER@$HOST" "mkdir -p ~/$REMOTE_DIR && chmod 750 ~/$REMOTE_DIR"
+          scp "${ssh_opts[@]}" "$RUNNER_TEMP/$BUNDLE" "$USER@$HOST:$REMOTE_DIR/$BUNDLE.uploading"
+          # Swap in atomically so a client never downloads a half-written file.
+          ssh "${ssh_opts[@]}" "$USER@$HOST" "chmod 640 ~/$REMOTE_DIR/$BUNDLE.uploading && mv -f ~/$REMOTE_DIR/$BUNDLE.uploading ~/$REMOTE_DIR/$BUNDLE && ls -l ~/$REMOTE_DIR/$BUNDLE"
+          rm -f ~/.ssh/deploy_key
