@@ -1,4 +1,3 @@
-[SKILL.md](https://github.com/user-attachments/files/34941104/SKILL.md)
 ---
 name: aaa-openclaw-installer
 description: Guide an approved Arlington AI Advisors client through installing OpenClaw from the AAA client bundle, preview first, with the client running each command in their own Terminal.
