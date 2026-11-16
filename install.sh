@@ -57,6 +57,7 @@ Your AI Studio — guided setup
 Requires macOS or Linux (including Ubuntu on WSL2), Bash, curl, and a terminal.
 The preview may download a temporary, checksum-verified Gum UI binary.
 Use --preview --plain for a preview with no downloads or file changes.
+STUDIO_REF selects the skills repository branch or tag to install (default: main).
 STUDIO_SKILLS_URL overrides where the skills repository is cloned from (default: GitHub).
 EOF
 }
