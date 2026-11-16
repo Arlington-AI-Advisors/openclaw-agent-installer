@@ -1,4 +1,3 @@
-[README.md](https://github.com/user-attachments/files/34941124/README.md)
 # Arlington AI Advisors: OpenClaw Installer
 
 This package is for approved AAA clients. Do not share it.
