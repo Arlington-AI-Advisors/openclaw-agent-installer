@@ -4,13 +4,16 @@
 set -Eeuo pipefail
 umask 077
 
-REPO_URL=https://github.com/ianmatson/openclaw-agent-installer.git
-REPO_REF=${STUDIO_REF:-main}
+SKILLS_URL=https://github.com/Arlington-AI-Advisors/skills.git
+SKILLS_REF=${STUDIO_REF:-main}
+SKILL_NAME=openclaw-studio
 GUM_VERSION=2.0.1
 GH_VERSION=2.101.0
 TOOLS="$HOME/.local/share/ai-studio"
 BIN="$HOME/.local/bin"
 CLAW_PREFIX="$TOOLS/openclaw"
+SKILLS_DIR="$TOOLS/skills"
+SKILL_DIR="$SKILLS_DIR/skills/$SKILL_NAME"
 export PATH="$BIN:$CLAW_PREFIX/bin:$PATH"
 WORK=''
 STAGE=''
@@ -54,7 +57,7 @@ Your AI Studio — guided setup
 Requires macOS or Linux (including Ubuntu on WSL2), Bash, curl, and a terminal.
 The preview may download a temporary, checksum-verified Gum UI binary.
 Use --preview --plain for a preview with no downloads or file changes.
-STUDIO_REF selects the repository branch or tag to clone (default: main).
+STUDIO_REF selects the skills repository branch or tag to install (default: main).
 EOF
 }
 
@@ -195,7 +198,7 @@ plan_tool() {
 
 ensure_git() {
   available git && return 0
-  say '  Git downloads your studio files. Its installer may ask for your computer password.'
+  say '  Git downloads your studio guide. Its installer may ask for your computer password.'
   if [[ "$OS" == Darwin ]]; then
     say '  Apple will open a window. Choose Install, then return here when it finishes.'
     xcode-select --install || true
@@ -266,46 +269,48 @@ validate_destination() {
   [[ "$DEST" == /* && "$DEST" != / && "$DEST" != "$HOME" ]] || die 'Choose a full folder path, such as ~/ai-studio, below your home folder.'
   [[ "$DEST" != *$'\n'* && "$DEST" != *$'\r'* ]] || die 'The folder path must fit on one line.'
   if [[ -e "$DEST" || -L "$DEST" ]]; then
-    [[ -d "$DEST/.git" && -f "$DEST/AGENTS.md" && -f "$DEST/process/00-orient.md" ]] ||
-      die 'That folder already exists and is not a studio checkout. Choose a new folder.'
-    local origin
-    origin=$(git -C "$DEST" remote get-url origin 2>/dev/null) || die 'Cannot identify this existing studio checkout.'
-    case "$origin" in
-      "$REPO_URL"|"${REPO_URL%.git}"|git@github.com:ianmatson/openclaw-agent-installer.git) ;;
-      *) die 'That folder belongs to another repository. Choose a new folder.' ;;
-    esac
-    say '  Found your existing studio. Setup will keep its files and current version.'
+    [[ -d "$DEST" && ! -L "$DEST" ]] || die 'That path is not a folder. Choose a new folder.'
+    if [[ -d "$DEST/.studio-setup" || -d "$DEST/knowledge" ]]; then
+      say '  Found your existing studio. Setup will keep its files.'
+    elif [[ -n "$(ls -A "$DEST")" ]]; then
+      die 'That folder already has other files. Choose a new or empty folder.'
+    fi
+  fi
+}
+
+install_skill() {
+  # Clone beside the destination, then swap, so an interrupted download keeps the previous skill.
+  mkdir -p "$TOOLS"
+  STAGE=$(mktemp -d "$TOOLS/.skills-download.XXXXXXXX")
+  run_task 'Downloading the studio guide skill' git clone --depth 1 --branch "$SKILLS_REF" "$SKILLS_URL" "$STAGE"
+  rm -rf -- "$SKILLS_DIR"
+  mv "$STAGE" "$SKILLS_DIR"
+  STAGE=''
+  [[ -f "$SKILL_DIR/SKILL.md" ]] || die "The downloaded skills repository has no $SKILL_NAME skill."
+  local skills_home link
+  case "$ASSISTANT" in
+    codex) skills_home="$HOME/.agents/skills" ;;
+    *) skills_home="$HOME/.claude/skills" ;;
+  esac
+  link="$skills_home/$SKILL_NAME"
+  mkdir -p "$skills_home"
+  if [[ -L "$link" || ! -e "$link" ]]; then
+    ln -sfn "$SKILL_DIR" "$link"
+  else
+    say "  Keeping your existing $SKILL_NAME skill at $link."
   fi
 }
 
 prepare_studio() {
-  if [[ ! -e "$DEST" ]]; then
-    # Clone beside the destination, then rename, so an interrupted clone is recoverable.
-    local parent
-    parent=$(dirname "$DEST")
-    mkdir -p "$parent"
-    STAGE=$(mktemp -d "$parent/.ai-studio-download.XXXXXXXX")
-    run_task 'Downloading your studio' git clone --depth 1 --branch "$REPO_REF" "$REPO_URL" "$STAGE"
-    [[ ! -e "$DEST" ]] || die 'The destination appeared during download. Choose another folder.'
-    mv "$STAGE" "$DEST"
-    STAGE=''
-  fi
-  # Local state is deliberately ignored. Never store credentials or full environment dumps.
-  # Older checkouts may not have the new .gitignore entry yet.
-  local exclude
-  exclude=$(cd "$DEST" && git rev-parse --git-path info/exclude)
-  [[ "$exclude" == /* ]] || exclude="$DEST/$exclude"
-  mkdir -p "$(dirname "$exclude")"
-  if ! grep -qxF '/.studio-setup/' "$exclude" 2>/dev/null; then
-    printf '\n/.studio-setup/\n' >> "$exclude"
-  fi
-  mkdir -p "$DEST/.studio-setup"
+  mkdir -p "$DEST/knowledge" "$DEST/.studio-setup"
+  [[ -e "$DEST/knowledge/README.md" ]] || cp "$SKILL_DIR/templates/knowledge-README.md" "$DEST/knowledge/README.md"
+  # Never store credentials or full environment dumps here.
   {
     printf 'Guide: %s\nPlatform: %s\n' "$ASSISTANT" "$OS"
     printf 'OpenClaw: '; openclaw --version
     printf 'GitHub CLI: '; gh --version | head -n 1
     printf 'Guide version: '; "$ASSISTANT" --version
-    printf 'Repository commit: '; git -C "$DEST" rev-parse HEAD
+    printf 'Skill commit: '; git -C "$SKILLS_DIR" rev-parse HEAD
     printf '\nTools are installed. Account sign-in and studio activation still need verification.\n'
   } > "$DEST/.studio-setup/context.txt"
   {
@@ -313,9 +318,16 @@ prepare_studio() {
     # shellcheck disable=SC2016 # The launcher must expand PATH when it runs.
     printf 'export PATH=%q:"$PATH"\n' "$BIN:$CLAW_PREFIX/bin"
     printf 'cd %q\n' "$DEST"
-    printf 'exec %q %q\n' "$ASSISTANT" 'Begin onboarding. Read AGENTS.md and .studio-setup/context.txt first. Verify installed tools, then guide me through the phases. If studio files already exist, ask where I stopped before changing them.'
+    printf 'exec %q %q\n' "$ASSISTANT" "$(skill_mention) Begin onboarding. Read .studio-setup/context.txt first. Verify installed tools, then guide me through the phases. If studio files already exist, ask where I stopped before changing them."
   } > "$DEST/.studio-setup/start"
   chmod 700 "$DEST/.studio-setup/start"
+}
+
+skill_mention() {
+  case "$ASSISTANT" in
+    codex) printf '$%s' "$SKILL_NAME" ;;
+    *) printf '/%s' "$SKILL_NAME" ;;
+  esac
 }
 
 main() {
@@ -365,9 +377,10 @@ main() {
 
   heading '03 / 05  Your setup plan' 'Keep what works. Install what is missing.'
   plan_tool "$ASSISTANT" "$ASSISTANT" 'Your guide through studio setup'
-  plan_tool git Git 'Downloads and tracks your studio files'
+  plan_tool git Git 'Downloads your studio guide and tracks your files'
   plan_tool gh 'GitHub CLI' 'Connects to GitHub when you want to save your work'
   plan_tool openclaw OpenClaw 'Runs your AI team, with a private Node runtime if needed'
+  say "  + Add  studio guide     The $SKILL_NAME skill that leads your setup"
   say "  Studio folder: $DEST"
   say ''
   say '  New tools use official downloads. Git may require your computer password.'
@@ -388,6 +401,7 @@ main() {
   ensure_gh
   ensure_openclaw
   ensure_assistant
+  install_skill
   say '  Preparing your studio folder…'
   prepare_studio
 
